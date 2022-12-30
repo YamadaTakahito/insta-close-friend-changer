@@ -2,6 +2,7 @@ import {IgApiClient} from "instagram-private-api";
 import * as fs from "fs";
 import {stringify} from "csv-stringify/sync";
 import {AccountRepositoryLoginResponseLogged_in_user} from "instagram-private-api/dist/responses";
+import {parse} from "csv-parse/sync";
 
 type Friend = {
   pk: number
@@ -55,9 +56,16 @@ const getFollowings = async (): Promise<Friend[]> => {
 }
 
 const removeAllCloseFriend = async () => {
-  const removeFriends = ["4008089659", "3265313838"]
+  const friends = await getCloseFriends()
+  const pks = friends.map(f => f.pk);
   await ig.friendship.setBesties({
-    remove: removeFriends
+    remove: pks
+  })
+}
+
+const addCloseFriend = async (pks: string[]) => {
+  await ig.friendship.setBesties({
+    add: pks
   })
 }
 
@@ -68,12 +76,36 @@ const saveCSV = (data: any, filepath: string) => {
   fs.writeFileSync(filepath, csvString);
 }
 
-const main = async () => {
-  await login()
-  // await getCloseFriends()
-  // await removeAllCloseFriend()
-  const followings = await getFollowings();
-  saveCSV(followings, "csv/followings.csv")
+const readCSV = (filepath: string): any => {
+  const data = fs.readFileSync(filepath);
+  const records = parse(data, {
+    columns: true
+  });
+  return records;
 }
 
-main()
+const switchCloseFriend = async (filepath: string, type: string) => {
+  const data = readCSV(filepath)
+  const pks: string[] = data.filter((d: any) => d["type"] === type)
+    .map((d: any) => d["pk"])
+  if (pks.length === 0) {
+    return
+  } else {
+    console.log(`${pks.length} users is detected`)
+  }
+
+  await login()
+  await removeAllCloseFriend()
+  await addCloseFriend(pks);
+}
+
+const main = async () => {
+  // await login()
+  // await getCloseFriends()
+  // await removeAllCloseFriend()
+  // const followings = await getFollowings();
+  // saveCSV(followings, "csv/followings.csv")
+}
+
+
+switchCloseFriend("csv/output.csv", "")
